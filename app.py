@@ -5,7 +5,7 @@ import soundfile as sf
 import matplotlib.pyplot as plt
 import numpy as np
 import librosa.display
-import io  # For in-memory audio storage
+import tempfile  # For temporary file storage
 
 # Function to load audio
 def load_audio(file):
@@ -22,67 +22,66 @@ def save_audio(audio, sr, output_path):
 
 # Function to plot waveform
 def plot_waveform(original_audio, reduced_audio, sr):
-    fig, axs = plt.subplots(2, 1, figsize=(10, 6))
-    axs[0].set_title("Original Audio Waveform")
-    librosa.display.waveshow(original_audio, sr=sr, ax=axs[0])
-    axs[1].set_title("Filtered Audio Waveform")
-    librosa.display.waveshow(reduced_audio, sr=sr, ax=axs[1])
-    plt.tight_layout()
-    return fig
+    fig, ax = plt.subplots(2, 1, figsize=(10, 6))
+    ax[0].set_title("Original Audio Waveform")
+    librosa.display.waveshow(original_audio, sr=sr, ax=ax[0])
+    ax[1].set_title("Filtered Audio Waveform")
+    librosa.display.waveshow(reduced_audio, sr=sr, ax=ax[1])
+    st.pyplot(fig)  # Pass the figure to st.pyplot()
 
 # Function to plot spectrogram
 def plot_spectrogram(original_audio, reduced_audio, sr):
-    fig, axs = plt.subplots(2, 1, figsize=(10, 6))
-    axs[0].set_title("Original Audio Spectrogram")
+    fig, ax = plt.subplots(2, 1, figsize=(10, 6))
+    
+    # Original audio spectrogram
+    ax[0].set_title("Original Audio Spectrogram")
     D_original = librosa.amplitude_to_db(np.abs(librosa.stft(original_audio)), ref=np.max)
-    img1 = librosa.display.specshow(D_original, sr=sr, x_axis='time', y_axis='log', ax=axs[0])
-    fig.colorbar(img1, ax=axs[0], format='%+2.0f dB')
-
-    axs[1].set_title("Filtered Audio Spectrogram")
+    img_original = librosa.display.specshow(D_original, sr=sr, x_axis='time', y_axis='log', ax=ax[0])
+    fig.colorbar(img_original, ax=ax[0], format='%+2.0f dB')  # Associate colorbar with spectrogram
+    
+    # Filtered audio spectrogram
+    ax[1].set_title("Filtered Audio Spectrogram")
     D_filtered = librosa.amplitude_to_db(np.abs(librosa.stft(reduced_audio)), ref=np.max)
-    img2 = librosa.display.specshow(D_filtered, sr=sr, x_axis='time', y_axis='log', ax=axs[1])
-    fig.colorbar(img2, ax=axs[1], format='%+2.0f dB')
+    img_filtered = librosa.display.specshow(D_filtered, sr=sr, x_axis='time', y_axis='log', ax=ax[1])
+    fig.colorbar(img_filtered, ax=ax[1], format='%+2.0f dB')  # Associate colorbar with spectrogram
+    
+    st.pyplot(fig)  # Pass the figure to st.pyplot()
 
-    plt.tight_layout()
-    return fig
 
 # Streamlit UI setup
 st.title("Background Noise Removal")
-st.write("Upload an audio file to remove background noise and focus on the speaker.")
+st.markdown("**Concillo | Go | Moncano | Paring**")
+st.markdown("**CPE416 - Final PIT**")
 
 # Upload audio file
 uploaded_file = st.file_uploader("Upload an Audio File", type=["wav", "mp3"])
 
 if uploaded_file is not None:
-    # Load the audio file
+    # Display the original audio directly from the uploaded file
+    st.write("Original Audio:")
+    st.audio(uploaded_file)  # Use the raw uploaded file directly for playback
+
+    # Load the audio for processing
     audio, sr = load_audio(uploaded_file)
     
-    # Display original audio
-    st.audio(uploaded_file.read(), format="audio/wav")  # Convert to bytes for st.audio
-    
     # Apply noise reduction
-    st.write("Processing the audio...")
     reduced_audio = noise_reduction(audio, sr)
     
+    # Save the processed audio to a temporary file
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+    save_audio(reduced_audio, sr, temp_file.name)
+    
     # Display the filtered audio
-    st.write("Here's the audio with reduced background noise:")
-    output_buffer = io.BytesIO()
-    sf.write(output_buffer, reduced_audio, sr, format="WAV")
-    output_buffer.seek(0)
-    st.audio(output_buffer.read(), format="audio/wav")  # Convert processed audio to bytes
+    st.write("Filtered Audio with Reduced Background Noise:")
+    st.audio(temp_file.name)  # Use the saved file path directly for playback
     
     # Plot waveform comparison
-    st.write("Waveform Comparison:")
-    waveform_fig = plot_waveform(audio, reduced_audio, sr)
-    st.pyplot(waveform_fig)
+    plot_waveform(audio, reduced_audio, sr)
     
     # Plot spectrogram comparison
-    st.write("Spectrogram Comparison:")
-    spectrogram_fig = plot_spectrogram(audio, reduced_audio, sr)
-    st.pyplot(spectrogram_fig)
+    plot_spectrogram(audio, reduced_audio, sr)
     
     # Save and provide download link
     output_path = "output_audio.wav"
     save_audio(reduced_audio, sr, output_path)
-    with open(output_path, "rb") as file:
-        st.download_button("Download Cleaned Audio", file, file_name="output_audio.wav")
+    st.download_button("Download Cleaned Audio", data=open(output_path, "rb"), file_name="output_audio.wav")
